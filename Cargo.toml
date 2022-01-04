@@ -8,8 +8,15 @@ edition = "2021"
 [dependencies]
 nom = "7.1.0"
 
-[dependencies.windows]
+[target.'cfg(windows)'.dependencies.windows]
 version = "0.29.0"
+features = [
+    "std",
+    "alloc",
+    "Win32_Foundation",
+    "Win32_Devices_DeviceAndDriverInstallation",
+    "Win32_System_Registry",
+]
 
 [[bin]]
 name = "lser"
