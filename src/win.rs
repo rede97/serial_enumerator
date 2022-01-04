@@ -169,6 +169,7 @@ unsafe fn get_serial_property(
     }
     return None;
 }
+
 unsafe fn get_serial_info(
     name: String,
     dev_set: *const c_void,
