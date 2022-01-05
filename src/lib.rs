@@ -15,7 +15,7 @@
 //!
 //! #[derive(Table)]
 //! struct SerialItem {
-//!     #[table(title = "name")]
+//!     #[table(title = "Name")]
 //!     name: String,
 //!     #[table(title = "Vendor", justify = "Justify::Center")]
 //!     vendor: String,
