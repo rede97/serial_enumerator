@@ -9,6 +9,7 @@
 //! ## Simple usage
 //!
 //! * print all serial port with table
+//! * binary cli-tool to list serial port [lser](https://crates.io/crates/lser)
 //! ```rust
 //! use cli_table::{format::Justify, print_stdout, Table, WithTitle};
 //! use serial_enumerator::{get_serial_list, SerialInfo};
