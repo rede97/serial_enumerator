@@ -193,7 +193,7 @@ fn probe_serial_by_prefix(
     }
 }
 
-/// get serial list
+/// enumerate all avaliable serial port
 pub fn get_serial_list() -> Vec<SerialInfo> {
     let mut serial_list = Vec::new();
     let serial_prefix = get_serial_prefix();

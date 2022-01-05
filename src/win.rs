@@ -184,6 +184,7 @@ unsafe fn get_serial_info(
     };
 }
 
+/// enumerate all avaliable serial port
 pub fn get_serial_list() -> Vec<SerialInfo> {
     let mut serial_list = Vec::new();
     let guids = get_device_class_guids_form_serial();
