@@ -19,7 +19,7 @@ path = "src/lib.rs"
 
 [dependencies]
 nom = "7.1.0"
-cli-table = "0.4.6"
+cli-table = "0.4"
 
 [target.'cfg(windows)'.dependencies.windows]
 version = "0.29.0"
