@@ -3,8 +3,13 @@ name = "serial_enumerator"
 version = "0.2.0"
 edition = "2018"
 license = "MIT"
-authors = ["Ma Xiaoqing <rede1997@outlook.com>"]
-description = "A serial port enumreator library writen in rust, which can help you to get serial ports and informations of you devices."
+authors = ["Xiaoqing Ma <rede1997@outlook.com>"]
+description = "A serial port enumreator library writen"
+homepage = "https://github.com/rede97/serial_enumerator"
+repository = "https://github.com/rede97/serial_enumerator"
+include = ["Cargo.toml", "src/**/*.rs", "README.md"]
+keywords = ["serial", "tty", "UART"]
+readme = "README.md"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
