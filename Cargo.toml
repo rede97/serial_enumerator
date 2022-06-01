@@ -1,6 +1,6 @@
 [package]
 name = "serial_enumerator"
-version = "0.2.4"
+version = "0.2.5"
 edition = "2018"
 license = "MIT"
 authors = ["Xiaoqing Ma <rede1997@outlook.com>"]
@@ -29,3 +29,8 @@ features = [
     "Win32_Devices_DeviceAndDriverInstallation",
     "Win32_System_Registry",
 ]
+
+[[bin]]
+name = "lser"
+path = "src/bin/lser.rs"
+test = false

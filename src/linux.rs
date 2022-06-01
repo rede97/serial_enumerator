@@ -99,32 +99,51 @@ fn get_file_real_name(device_path: &PathBuf, name: &str) -> Option<String> {
 }
 
 fn probe_usb_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) -> bool {
+    let mut interface = None;
+    for _ in 0..3 {
+        real_dev_path.push("interface");
+        if real_dev_path.exists() {
+            interface = read_line(&real_dev_path);
+        }
+        real_dev_path.pop();
+
+        real_dev_path.push("manufacturer");
+        if real_dev_path.exists() {
+            serial_info.vendor = read_line(&real_dev_path);
+            real_dev_path.pop();
+            real_dev_path.push("product");
+            serial_info.product = read_line(&real_dev_path).and_then(|mut product| {
+                if let Some(iface) = &interface {
+                    if iface != product.as_str() {
+                        product.push('/');
+                        product.push_str(&iface);
+                        return Some(product);
+                    }
+                }
+                Some(product)
+            });
+            real_dev_path.pop();
+            real_dev_path.push("idVendor");
+            let vid = read_line(&real_dev_path).expect(real_dev_path.to_str().unwrap());
+            real_dev_path.pop();
+            real_dev_path.push("idProduct");
+            let pid = read_line(&real_dev_path).expect(real_dev_path.to_str().unwrap());
+            serial_info.usb_info = Some(UsbInfo { vid, pid });
+        } else {
+            real_dev_path.pop();
+            real_dev_path.push("../");
+        }
+    }
+    return true;
+}
+
+fn probe_acm_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) -> bool {
     real_dev_path.push("subsystem");
     let dev_subsystem = fs::canonicalize(&real_dev_path).expect(real_dev_path.to_str().unwrap());
     real_dev_path.pop();
 
-    {
-        let mut usb_dev_path = real_dev_path.clone();
-        if dev_subsystem.ends_with("usb-serial") {
-            usb_dev_path.push("../../");
-        } else if dev_subsystem.ends_with("serial") {
-            usb_dev_path.push("../");
-        } else {
-            panic!("unreachable branch: {:?}", real_dev_path);
-        };
-
-        usb_dev_path.push("manufacturer");
-        serial_info.vendor = read_line(&usb_dev_path);
-        usb_dev_path.pop();
-        usb_dev_path.push("product");
-        serial_info.product = read_line(&usb_dev_path);
-        usb_dev_path.pop();
-        usb_dev_path.push("idVendor");
-        let vid = read_line(&usb_dev_path).expect(usb_dev_path.to_str().unwrap());
-        usb_dev_path.pop();
-        usb_dev_path.push("idProduct");
-        let pid = read_line(&usb_dev_path).expect(usb_dev_path.to_str().unwrap());
-        serial_info.usb_info = Some(UsbInfo { vid, pid });
+    if dev_subsystem.ends_with("usb") {
+        return probe_usb_serial(real_dev_path, serial_info);
     }
     return true;
 }
@@ -179,10 +198,15 @@ fn probe_serial_by_prefix(
                         usb_info: None,
                     };
                     if real_dev_path.exists() {
-                        if match driver_class.as_str() {
-                            "usbserial" => probe_usb_serial(real_dev_path, &mut serial_info),
-                            _ => probe_builtin_serial(real_dev_path, &mut serial_info),
-                        } {
+                        let is_valid_serial = if file_name.starts_with("ttyACM") {
+                            probe_acm_serial(real_dev_path, &mut serial_info)
+                        } else {
+                            match driver_class.as_str() {
+                                "usbserial" => probe_usb_serial(real_dev_path, &mut serial_info),
+                                _ => probe_builtin_serial(real_dev_path, &mut serial_info),
+                            }
+                        };
+                        if is_valid_serial {
                             serial_list.push(serial_info);
                         }
                     }

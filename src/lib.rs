@@ -1,4 +1,3 @@
-
 //! # serial_enumerator
 //!
 //! A serial port enumreator library writen in rust, which can help you to get serial ports and informations of you devices.
