@@ -72,6 +72,12 @@ mod linux;
 #[cfg(target_os = "linux")]
 pub use linux::get_serial_list;
 
+#[cfg(target_os = "macos")]
+mod macos;
+
+#[cfg(target_os = "macos")]
+pub use macos::get_serial_list;
+
 #[derive(Debug)]
 /// usb information of serial port
 pub struct UsbInfo {
