@@ -99,12 +99,12 @@ fn get_file_real_name(device_path: &PathBuf, name: &str) -> Option<String> {
 }
 
 fn probe_usb_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) -> bool {
-    let mut interface = None;
+    let mut interface_num = None;
     for _ in 0..3 {
         // read interface
-        if interface.is_none() {
+        if interface_num.is_none() {
             real_dev_path.push("bInterfaceNumber");
-            interface = read_line(&real_dev_path);
+            interface_num = read_line(&real_dev_path);
             real_dev_path.pop();
         }
 
@@ -116,13 +116,11 @@ fn probe_usb_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) ->
         // read product
         real_dev_path.push("product");
         serial_info.product = read_line(&real_dev_path).and_then(|mut product| {
-            if let Some(iface) = &interface {
+            if let Some(iface_num) = &interface_num {
                 // For example: FT2232 with dual port serial
-                if iface != product.as_str() {
-                    product.push(':');
-                    product.push_str(&iface);
-                    return Some(product);
-                }
+                product.push(':');
+                product.push_str(&iface_num);
+                return Some(product);
             }
             Some(product)
         });
