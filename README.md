@@ -8,7 +8,7 @@ A serial port enumreator library writen in rust, which can help you to get seria
 ## Simple usage
 
 * print all serial port with table
-* binary cli-tool to list serial port [lser](https://crates.io/crates/lser)
+* The sample cli-tool to list serial port: [lser](https://crates.io/crates/lser)
 
 ```rust
 use cli_table::{format::Justify, print_stdout, Table, WithTitle};
