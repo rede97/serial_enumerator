@@ -2,7 +2,7 @@
 
 A serial port enumreator library writen in rust, which can help you to get serial ports and informations of you devices.
 
-* Support Linux, Windows
+* Support Linux, Windows, MacOS
 * Support arm and x86 devices of linux
 
 ## Simple usage
