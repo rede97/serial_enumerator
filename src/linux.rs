@@ -101,40 +101,53 @@ fn get_file_real_name(device_path: &PathBuf, name: &str) -> Option<String> {
 fn probe_usb_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) -> bool {
     let mut interface = None;
     for _ in 0..3 {
-        real_dev_path.push("interface");
-        if real_dev_path.exists() {
+        // read interface
+        if interface.is_none() {
+            real_dev_path.push("bInterfaceNumber");
             interface = read_line(&real_dev_path);
+            real_dev_path.pop();
         }
+
+        // read vendor
+        real_dev_path.push("manufacturer");
+        serial_info.vendor = read_line(&real_dev_path);
         real_dev_path.pop();
 
-        real_dev_path.push("manufacturer");
-        if real_dev_path.exists() {
-            serial_info.vendor = read_line(&real_dev_path);
-            real_dev_path.pop();
-            real_dev_path.push("product");
-            serial_info.product = read_line(&real_dev_path).and_then(|mut product| {
-                if let Some(iface) = &interface {
-                    if iface != product.as_str() {
-                        product.push('/');
-                        product.push_str(&iface);
-                        return Some(product);
-                    }
+        // read product
+        real_dev_path.push("product");
+        serial_info.product = read_line(&real_dev_path).and_then(|mut product| {
+            if let Some(iface) = &interface {
+                // For example: FT2232 with dual port serial
+                if iface != product.as_str() {
+                    product.push(':');
+                    product.push_str(&iface);
+                    return Some(product);
                 }
-                Some(product)
-            });
-            real_dev_path.pop();
-            real_dev_path.push("idVendor");
-            let vid = read_line(&real_dev_path).expect(real_dev_path.to_str().unwrap());
-            real_dev_path.pop();
-            real_dev_path.push("idProduct");
-            let pid = read_line(&real_dev_path).expect(real_dev_path.to_str().unwrap());
+            }
+            Some(product)
+        });
+        real_dev_path.pop();
+        // read vid and pid
+        real_dev_path.push("idVendor");
+        let vid = read_line(&real_dev_path);
+        real_dev_path.pop();
+        real_dev_path.push("idProduct");
+        let pid = read_line(&real_dev_path);
+        real_dev_path.pop();
+        if let (Some(vid), Some(pid)) = (vid, pid) {
             serial_info.usb_info = Some(UsbInfo { vid, pid });
-        } else {
-            real_dev_path.pop();
+        }
+
+        if serial_info.vendor.is_none()
+            && serial_info.product.is_none()
+            && serial_info.usb_info.is_none()
+        {
             real_dev_path.push("../");
+        } else {
+            return true;
         }
     }
-    return true;
+    return false;
 }
 
 fn probe_acm_serial(mut real_dev_path: PathBuf, serial_info: &mut SerialInfo) -> bool {
