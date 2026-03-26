@@ -1,5 +1,7 @@
 # serial_enumerator
 
+[![Rust](https://github.com/rede97/serial_enumerator/actions/workflows/rust.yml/badge.svg)](https://github.com/rede97/serial_enumerator/actions/workflows/rust.yml)
+
 A serial port enumreator library writen in rust, which can help you to get serial ports and informations of you devices.
 
 * Support Linux, Windows, MacOS

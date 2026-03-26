@@ -1,6 +1,6 @@
 [package]
 name = "serial_enumerator"
-version = "0.2.12"
+version = "0.2.13"
 edition = "2018"
 license = "MIT"
 authors = ["Xiaoqing Ma <rede1997@outlook.com>"]
