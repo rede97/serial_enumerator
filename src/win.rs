@@ -177,6 +177,7 @@ unsafe fn get_serial_info(
 ) -> SerialInfo {
     return SerialInfo {
         name,
+        valid: true,
         vendor: get_serial_property(dev_set, dev_inf, SPDRP_MFG),
         product: get_serial_property(dev_set, dev_inf, SPDRP_DEVICEDESC),
         driver: None,

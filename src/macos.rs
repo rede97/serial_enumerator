@@ -144,6 +144,7 @@ fn get_serial_info(modem_service: io_iterator_t, name: &str) -> SerialInfo {
 
         return SerialInfo {
             name: name.to_string(),
+            valid: true,
             vendor,
             product,
             driver: None,
@@ -152,6 +153,7 @@ fn get_serial_info(modem_service: io_iterator_t, name: &str) -> SerialInfo {
     }
     return SerialInfo {
         name: name.to_string(),
+        valid: true,
         vendor: None,
         product: None,
         driver: None,

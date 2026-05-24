@@ -203,13 +203,14 @@ fn probe_serial_by_prefix(
                         fs::canonicalize(&device_path).expect(device_path.to_str().unwrap());
                     let mut serial_info = SerialInfo {
                         name: format!("/dev/{}", file_name),
+                        valid: false,
                         vendor: None,
                         product: None,
                         driver: get_file_real_name(&real_dev_path, "driver"),
                         usb_info: None,
                     };
                     if real_dev_path.exists() {
-                        let is_valid_serial = if file_name.starts_with("ttyACM") {
+                        serial_info.valid = if file_name.starts_with("ttyACM") {
                             probe_acm_serial(real_dev_path, &mut serial_info)
                         } else {
                             match driver_class.as_str() {
@@ -217,10 +218,8 @@ fn probe_serial_by_prefix(
                                 _ => probe_builtin_serial(real_dev_path, &mut serial_info),
                             }
                         };
-                        if is_valid_serial {
-                            serial_list.push(serial_info);
-                        }
                     }
+                    serial_list.push(serial_info);
                     break;
                 }
             }

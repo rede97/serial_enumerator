@@ -1,63 +1,52 @@
 //! # serial_enumerator
 //!
-//! A serial port enumreator library writen in rust, which can help you to get serial ports and informations of you devices.
+//! [![Crates.io](https://img.shields.io/crates/v/serial_enumerator)](https://crates.io/crates/serial_enumerator)
+//! [![Crates.io Downloads](https://img.shields.io/crates/d/serial_enumerator)](https://crates.io/crates/serial_enumerator)
+//! [![Docs.rs](https://docs.rs/serial_enumerator/badge.svg)](https://docs.rs/serial_enumerator)
+//! [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+//! [![Build Status](https://github.com/rede97/serial_enumerator/actions/workflows/rust.yml/badge.svg)](https://github.com/rede97/serial_enumerator/actions/workflows/rust.yml)
 //!
-//! * Support Linux, Windows
-//! * Support arm and x86 devices of linux
+//! A cross-platform serial port enumeration library for Linux, Windows, and macOS.
+//! Returns available serial ports with vendor, product, driver, and USB VID/PID
+//! information.
 //!
-//! ## Simple usage
+//! Unlike tools that blindly list every TTY device, this library validates each port
+//! and exposes a [`valid`](SerialInfo::valid) field so you can distinguish functional
+//! ports from false positives.
 //!
-//! * print all serial port with table
-//! * binary cli-tool to list serial port [lser](https://crates.io/crates/lser)
-//! ```rust,ignore
-//! use cli_table::{format::Justify, print_stdout, Table, WithTitle};
-//! use serial_enumerator::{get_serial_list, SerialInfo};
+//! ## Quick Start
 //!
-//! #[derive(Table)]
-//! struct SerialItem {
-//!     #[table(title = "Name")]
-//!     name: String,
-//!     #[table(title = "Vendor", justify = "Justify::Center")]
-//!     vendor: String,
-//!     #[table(title = "Product", justify = "Justify::Center")]
-//!     product: String,
-//!     #[table(title = "USB", justify = "Justify::Center")]
-//!     usb: String,
+//! ```rust
+//! use serial_enumerator::get_serial_list;
+//!
+//! for port in get_serial_list() {
+//!     println!("{}  valid={}", port.name, port.valid);
 //! }
-//!
-//! impl SerialItem {
-//!     pub fn from_serial_info(serial_info: SerialInfo) -> SerialItem {
-//!         let field_or_else = || Some(String::from("--"));
-//!         return SerialItem {
-//!             name: serial_info.name,
-//!             vendor: serial_info.vendor.or_else(field_or_else).unwrap(),
-//!             product: serial_info.product.or_else(field_or_else).unwrap(),
-//!             usb: serial_info
-//!                 .usb_info
-//!                 .and_then(|usbinfo| Some(format!("{}:{}", usbinfo.vid, usbinfo.pid)))
-//!                 .or_else(field_or_else)
-//!                 .unwrap(),
-//!         };
-//!     }
-//! }
-//!
-//! fn main() {
-//!     let serials_info = get_serial_list();
-//!     let mut serials_table = Vec::new();
-//!     for serial_info in serials_info {
-//!         serials_table.push(SerialItem::from_serial_info(serial_info));
-//!     }
-//!     print_stdout(serials_table.with_title()).unwrap();
-//! }
-//!
 //! ```
-//! * Output
+//!
+//! ## CLI Tool
+//!
+//! A command-line tool [`lser`](https://crates.io/crates/lser) is included.
+//! Install with:
+//!
 //! ```bash
-//! +------+--------+------------------+-----------+
-//! | Name | Vendor | Product          | USB       |
-//! +------+--------+------------------+-----------+
-//! | COM4 | wch.cn | USB-SERIAL CH340 | 1A86:7523 |
-//! +------+--------+------------------+-----------+
+//! cargo install serial_enumerator
+//! lser
+//! ```
+//!
+//! ## Example Output
+//!
+//! **Linux:**
+//!
+//! ```text
+//! SerialInfo { name: "/dev/ttyS0", valid: true, vendor: Some("pnp"), product: Some("PNP0501"), driver: Some("serial"), usb_info: None }
+//! SerialInfo { name: "/dev/ttyUSB0", valid: true, vendor: Some("FTDI"), product: Some("Dual RS232-HS:00"), driver: Some("usbserial"), usb_info: Some(UsbInfo { vid: "0403", pid: "6010" }) }
+//! ```
+//!
+//! **Windows:**
+//!
+//! ```text
+//! SerialInfo { name: "COM4", valid: true, vendor: Some("wch.cn"), product: Some("USB-SERIAL CH340"), driver: None, usb_info: Some(UsbInfo { vid: "1A86", pid: "7523" }) }
 //! ```
 
 #[cfg(target_os = "windows")]
@@ -78,26 +67,34 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::get_serial_list;
 
+/// USB identification for a serial device.
 #[derive(Debug)]
-/// usb information of serial port
 pub struct UsbInfo {
-    /// Vendor ID
+    /// Vendor ID as a 4-character hex string (e.g. `"1A86"`).
     pub vid: String,
-    /// Product ID
+    /// Product ID as a 4-character hex string (e.g. `"7523"`).
     pub pid: String,
 }
 
+/// Information about an enumerated serial port.
+///
+/// Returned by [`get_serial_list`].
 #[derive(Debug)]
-/// serial port informations
 pub struct SerialInfo {
-    /// serial port name
+    /// Port name — `"COM3"` on Windows, `"/dev/ttyUSB0"` on Linux/macOS.
     pub name: String,
-    /// vendor info
+    /// Whether the port is confirmed usable for serial communication.
+    ///
+    /// On Linux, this reflects whether the probe found USB descriptors,
+    /// a device-tree node, or a PNP ID. On Windows and macOS it is always
+    /// `true` for returned ports.
+    pub valid: bool,
+    /// Manufacturer or vendor name (e.g. `"FTDI"`, `"wch.cn"`).
     pub vendor: Option<String>,
-    /// product info
+    /// Product description string.
     pub product: Option<String>,
-    /// linux only, driver name of current serial port
+    /// Kernel driver name (Linux only; `None` on other platforms).
     pub driver: Option<String>,
-    /// usb serial port only, vid and pid provided
+    /// USB VID/PID if the port is a USB-serial adapter.
     pub usb_info: Option<UsbInfo>,
 }
