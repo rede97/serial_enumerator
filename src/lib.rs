@@ -67,6 +67,11 @@ mod macos;
 #[cfg(target_os = "macos")]
 pub use macos::get_serial_list;
 
+// Shared by win.rs; also compiled under `cfg(test)` on every
+// platform so the parser unit tests run everywhere.
+#[cfg(any(target_os = "windows", test))]
+mod device_id;
+
 /// USB identification for a serial device.
 #[derive(Debug)]
 pub struct UsbInfo {
