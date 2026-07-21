@@ -137,10 +137,18 @@ fn get_serial_info(modem_service: io_iterator_t, name: &str) -> SerialInfo {
     let maybe_usb_device = get_parent_device_by_type(modem_service, usb_device_class_name)
         .or_else(|| get_parent_device_by_type(modem_service, legacy_usb_device_class_name));
     if let Some(usb_device) = maybe_usb_device {
-        let vid = get_int_property(usb_device, "idVendor", kCFNumberSInt16Type).unwrap_or_default();
-        let pid = get_int_property(usb_device, "idProduct", kCFNumberSInt16Type).unwrap_or_default();
+        let vid = get_int_property(usb_device, "idVendor", kCFNumberSInt16Type);
+        let pid = get_int_property(usb_device, "idProduct", kCFNumberSInt16Type);
         let vendor = get_string_property(usb_device, "USB Vendor Name");
         let product = get_string_property(usb_device, "USB Product Name");
+
+        let usb_info = match (vid, pid) {
+            (Some(vid), Some(pid)) => Some(UsbInfo {
+                vid: format!("{:04X}", vid),
+                pid: format!("{:04X}", pid),
+            }),
+            _ => None,
+        };
 
         return SerialInfo {
             name: name.to_string(),
@@ -148,7 +156,7 @@ fn get_serial_info(modem_service: io_iterator_t, name: &str) -> SerialInfo {
             vendor,
             product,
             driver: None,
-            usb_info: Some(UsbInfo { vid: format!("{:x}", vid), pid: format!("{:x}", pid) })
+            usb_info,
         }
     }
     return SerialInfo {

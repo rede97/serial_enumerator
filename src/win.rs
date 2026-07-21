@@ -1,3 +1,4 @@
+use crate::device_id;
 use crate::{SerialInfo, UsbInfo};
 use core::ffi::c_void;
 use std::mem::size_of;
@@ -10,57 +11,6 @@ use windows::Win32::Devices::DeviceAndDriverInstallation::{
 };
 use windows::Win32::Foundation::PSTR;
 use windows::Win32::System::Registry::{RegCloseKey, RegQueryValueExA, KEY_READ};
-
-mod device_id_parser {
-    use nom::branch::alt;
-    use nom::bytes::complete::{tag, take_while_m_n};
-    use nom::sequence::{delimited, preceded, separated_pair};
-    use nom::{AsChar, IResult};
-
-    fn usb_prefix_parser(s: &str) -> IResult<&str, &str> {
-        return alt((tag("USB"), tag("FTDIBUS")))(s);
-    }
-
-    fn usbid_parser(s: &str) -> IResult<&str, &str> {
-        return take_while_m_n(4, 4, |c: char| c.is_hex_digit())(s);
-    }
-
-    fn vid_pid_parser(s: &str) -> IResult<&str, (&str, &str)> {
-        return delimited(
-            tag("\\"),
-            separated_pair(
-                preceded(tag("VID_"), usbid_parser),
-                tag("&"),
-                preceded(tag("PID_"), usbid_parser),
-            ),
-            tag("\\"),
-        )(s);
-    }
-
-    fn device_id_parser(s: &str) -> IResult<&str, (&str, &str)> {
-        return preceded(usb_prefix_parser, vid_pid_parser)(s);
-    }
-
-    /// parse line of /proc/tty/drivers
-    pub fn parse_device_id(device_id: &str) -> Option<(String, String)> {
-        match device_id_parser(device_id) {
-            Ok((_, (vid, pid))) => {
-                return Some((vid.into(), pid.into()));
-            }
-            Err(_) => return None,
-        }
-    }
-
-    #[cfg(test)]
-    mod tests {
-        use super::*;
-        #[test]
-        fn test_drivers_line_parse() {
-            let result = parse_device_id(r"USB\VID_1A86&PID_7523\7&139F9FFA&0&2").unwrap();
-            assert_eq!(result, ("1A86".into(), "7523".into()));
-        }
-    }
-}
 
 fn get_device_class_guids_form_serial() -> Option<Vec<GUID>> {
     const DEVICE_NAME: &str = "Ports";
@@ -129,7 +79,7 @@ unsafe fn get_usb_info(dev_set: *const c_void, dev_inf: &SP_DEVINFO_DATA) -> Opt
     {
         buffer.set_len(id_size as usize - 1);
         let device_id = String::from_utf8(buffer).unwrap();
-        return device_id_parser::parse_device_id(device_id.as_str())
+        return device_id::parse_device_id(device_id.as_str())
             .and_then(|(vid, pid)| Some(UsbInfo { vid, pid }));
     }
     return None;

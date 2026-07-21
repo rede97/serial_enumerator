@@ -23,6 +23,8 @@ Cross-platform serial port enumeration library. `src/lib.rs` defines the public 
 
 All three modules export `pub fn get_serial_list() -> Vec<SerialInfo>`.
 
+`src/device_id.rs` is a shared parser for Windows device instance IDs (`USB\VID_xxxx&PID_xxxx\...`, FTDIBUS `+`-separator variant, composite `&MI_xx`). It is compiled for Windows and under `cfg(test)` on all platforms so its unit tests run everywhere.
+
 ## Key Data Structures (`src/lib.rs`)
 
 - **`SerialInfo`** — name, `valid`, vendor, product, driver (Linux only), usb_info
