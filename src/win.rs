@@ -1,36 +1,27 @@
 use crate::device_id;
 use crate::{SerialInfo, UsbInfo};
-use core::ffi::c_void;
 use std::mem::size_of;
 use windows::core::GUID;
 use windows::Win32::Devices::DeviceAndDriverInstallation::{
     SetupDiClassGuidsFromNameA, SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo,
     SetupDiGetClassDevsA, SetupDiGetDeviceInstanceIdA, SetupDiGetDeviceRegistryPropertyW,
-    SetupDiOpenDevRegKey, DICS_FLAG_GLOBAL, DIGCF_PRESENT, DIREG_DEV, SPDRP_DEVICEDESC, SPDRP_MFG,
-    SP_DEVINFO_DATA,
+    SetupDiOpenDevRegKey, DICS_FLAG_GLOBAL, DIGCF_PRESENT, DIREG_DEV, HDEVINFO, SPDRP_DEVICEDESC,
+    SPDRP_MFG, SP_DEVINFO_DATA,
 };
-use windows::Win32::Foundation::PSTR;
 use windows::Win32::System::Registry::{RegCloseKey, RegQueryValueExA, KEY_READ};
 
 fn get_device_class_guids_form_serial() -> Option<Vec<GUID>> {
-    const DEVICE_NAME: &str = "Ports";
+    const DEVICE_NAME: ::windows::core::PCSTR = ::windows::core::s!("Ports");
     let mut required_size: u32 = 0;
     unsafe {
-        SetupDiClassGuidsFromNameA(DEVICE_NAME, std::ptr::null_mut(), 0, &mut required_size);
+        // Probe call: fails with ERROR_INSUFFICIENT_BUFFER but fills
+        // required_size — the failure is expected, do not abort on it.
+        let _ = SetupDiClassGuidsFromNameA(DEVICE_NAME, &mut [], &mut required_size);
     }
-    let mut guids = Vec::with_capacity(required_size as usize);
-    let status = unsafe {
-        let status = SetupDiClassGuidsFromNameA(
-            DEVICE_NAME,
-            guids.as_mut_ptr(),
-            required_size,
-            &mut required_size,
-        );
-        guids.set_len(required_size as usize);
-        status
-    };
+    let mut guids = vec![GUID::zeroed(); required_size as usize];
+    let status = unsafe { SetupDiClassGuidsFromNameA(DEVICE_NAME, &mut guids, &mut required_size) };
 
-    if status.as_bool() {
+    if status.is_ok() {
         return Some(guids);
     } else {
         return None;
@@ -38,46 +29,37 @@ fn get_device_class_guids_form_serial() -> Option<Vec<GUID>> {
 }
 
 unsafe fn get_port_name_from_dev_info(
-    dev_set: *const c_void,
+    dev_set: HDEVINFO,
     dev_inf: &SP_DEVINFO_DATA,
 ) -> Option<String> {
-    let hkey = SetupDiOpenDevRegKey(dev_set, dev_inf, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ);
-    if hkey == 0 {
-        return None;
-    }
+    let hkey =
+        SetupDiOpenDevRegKey(dev_set, dev_inf, DICS_FLAG_GLOBAL, 0, DIREG_DEV, KEY_READ.0).ok()?;
     let mut name_size: u32 = 1024;
-    let mut ltype = 0;
-    let mut buffer = Vec::with_capacity(name_size as usize);
+    let mut ltype = windows::Win32::System::Registry::REG_VALUE_TYPE(0);
+    let mut buffer = vec![0u8; name_size as usize];
     let result = RegQueryValueExA(
         hkey,
-        "PortName",
-        std::ptr::null_mut(),
-        &mut ltype,
-        buffer.as_mut_ptr(),
-        &mut name_size,
+        ::windows::core::s!("PortName"),
+        None,
+        Some(&mut ltype),
+        Some(buffer.as_mut_ptr()),
+        Some(&mut name_size),
     );
-    RegCloseKey(hkey);
-    if result == 0 {
-        buffer.set_len(name_size as usize - 1);
+    RegCloseKey(hkey).ok()?;
+    if result.is_ok() {
+        buffer.truncate(name_size as usize - 1);
         let port_name = String::from_utf8(buffer).unwrap();
         return Some(port_name);
     }
     return None;
 }
 
-unsafe fn get_usb_info(dev_set: *const c_void, dev_inf: &SP_DEVINFO_DATA) -> Option<UsbInfo> {
+unsafe fn get_usb_info(dev_set: HDEVINFO, dev_inf: &SP_DEVINFO_DATA) -> Option<UsbInfo> {
     let mut id_size: u32 = 1024;
-    let mut buffer = Vec::with_capacity(id_size as usize);
-    if SetupDiGetDeviceInstanceIdA(
-        dev_set,
-        dev_inf,
-        PSTR(buffer.as_mut_ptr()),
-        id_size,
-        &mut id_size,
-    )
-    .as_bool()
+    let mut buffer = vec![0u8; id_size as usize];
+    if SetupDiGetDeviceInstanceIdA(dev_set, dev_inf, Some(&mut buffer), Some(&mut id_size)).is_ok()
     {
-        buffer.set_len(id_size as usize - 1);
+        buffer.truncate(id_size as usize - 1);
         let device_id = String::from_utf8(buffer).unwrap();
         return device_id::parse_device_id(device_id.as_str())
             .and_then(|(vid, pid)| Some(UsbInfo { vid, pid }));
@@ -96,33 +78,37 @@ fn utf16_to_utf8(utf16: &[u16]) -> Option<String> {
 }
 
 unsafe fn get_serial_property(
-    dev_set: *const c_void,
+    dev_set: HDEVINFO,
     dev_inf: &SP_DEVINFO_DATA,
-    mut property: u32,
+    property: u32,
 ) -> Option<String> {
     let mut property_size: u32 = 1024;
-    let mut buffer: Vec<u16> = Vec::with_capacity(property_size as usize);
+    let mut buffer = vec![0u8; property_size as usize];
+    let mut property_type = 0;
 
     if SetupDiGetDeviceRegistryPropertyW(
         dev_set,
         dev_inf,
         property,
-        &mut property,
-        buffer.as_mut_ptr() as *mut u8,
-        property_size,
-        &mut property_size,
+        Some(&mut property_type),
+        Some(&mut buffer),
+        Some(&mut property_size),
     )
-    .as_bool()
+    .is_ok()
     {
-        buffer.set_len(property_size as usize);
-        return utf16_to_utf8(&buffer);
+        buffer.truncate(property_size as usize);
+        let utf16: Vec<u16> = buffer
+            .chunks_exact(2)
+            .map(|c| u16::from_ne_bytes([c[0], c[1]]))
+            .collect();
+        return utf16_to_utf8(&utf16);
     }
     return None;
 }
 
 unsafe fn get_serial_info(
     name: String,
-    dev_set: *const c_void,
+    dev_set: HDEVINFO,
     dev_inf: &SP_DEVINFO_DATA,
 ) -> SerialInfo {
     return SerialInfo {
@@ -141,36 +127,37 @@ pub fn get_serial_list() -> Vec<SerialInfo> {
     let guids = get_device_class_guids_form_serial();
     for guid in guids.unwrap() {
         unsafe {
-            let dev_set = SetupDiGetClassDevsA(&guid, None, None, DIGCF_PRESENT);
-            if dev_set > std::ptr::null_mut() {
-                let mut dev_cnt = 0;
-                loop {
-                    let mut dev_info = SP_DEVINFO_DATA {
-                        cbSize: size_of::<SP_DEVINFO_DATA>() as u32,
-                        ClassGuid: GUID::zeroed(),
-                        DevInst: 0,
-                        Reserved: 0,
-                    };
+            let dev_set = match SetupDiGetClassDevsA(Some(&guid), None, None, DIGCF_PRESENT) {
+                Ok(dev_set) => dev_set,
+                Err(_) => continue,
+            };
+            let mut dev_cnt = 0;
+            loop {
+                let mut dev_info = SP_DEVINFO_DATA {
+                    cbSize: size_of::<SP_DEVINFO_DATA>() as u32,
+                    ClassGuid: GUID::zeroed(),
+                    DevInst: 0,
+                    Reserved: 0,
+                };
 
-                    let result = SetupDiEnumDeviceInfo(dev_set, dev_cnt, &mut dev_info);
-                    if !result.as_bool() {
-                        break;
-                    }
-                    dev_cnt += 1;
-
-                    let port_name = get_port_name_from_dev_info(dev_set, &dev_info);
-                    match port_name {
-                        Some(port_name) => {
-                            if port_name.starts_with("COM") {
-                                let serial_info = get_serial_info(port_name, dev_set, &dev_info);
-                                serial_list.push(serial_info);
-                            }
-                        }
-                        None => {}
-                    }
+                let result = SetupDiEnumDeviceInfo(dev_set, dev_cnt, &mut dev_info);
+                if result.is_err() {
+                    break;
                 }
-                SetupDiDestroyDeviceInfoList(dev_set);
+                dev_cnt += 1;
+
+                let port_name = get_port_name_from_dev_info(dev_set, &dev_info);
+                match port_name {
+                    Some(port_name) => {
+                        if port_name.starts_with("COM") {
+                            let serial_info = get_serial_info(port_name, dev_set, &dev_info);
+                            serial_list.push(serial_info);
+                        }
+                    }
+                    None => {}
+                }
             }
+            SetupDiDestroyDeviceInfoList(dev_set).ok();
         }
     }
     return serial_list;
